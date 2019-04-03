@@ -2,7 +2,7 @@
 
 <template>
   <div class="container">
-    <div class="item" v-for="item in list" :key="item.id" :ref="item.id">
+    <div class="item" :ref="`videoBox`">
       <video class="video" autoplay muted></video>
     </div>
   </div>
@@ -12,8 +12,8 @@
 import io from "socket.io-client";
 import _ from "lodash";
 
+
 import kurentoUtils from "kurento-utils";
-import { Msgbody } from "../Msgbody";
 import { EventEmitter } from "events";
 
 const I_CAN_START = 0;
@@ -24,37 +24,33 @@ function onError(msg) {
   console.warn(msg);
 }
 class VideoItem {
-  constructor(id) {
+  constructor({ sessionid, path, attr }) {
     let stopEvent = new EventEmitter();
     return {
-      id,
-      rtsp: "",
+      sessionid,
+      rtsp: path,
       video: null,
       webRtcPeer: null,
       state: null,
       isSeekable: false,
-      attr: null,
+      attr,
       stopEvent
     };
   }
 }
 
 export default {
-  name: "HelloWorld",
   props: {
-    col: Number, // 列
-    row: Number, // 行
-    path: String //只有一个的video
+    msgbody:{}
   },
   data() {
     return {
       test: "",
-      list: [],
+      videoitem: {},
       socket: null,
       socketPath: "signal"
     };
   },
-  watch: {},
   // beforeDestroy() {
   //   this.stopAll();
   // },
@@ -107,9 +103,9 @@ export default {
       });
     },
     init(videoItem) {
-      const elem = (videoItem.video = this.$refs[videoItem.id][0].querySelector(
-        "video"
-      ));
+      const elem = (videoItem.video = this.$refs[
+        'videoBox'
+      ].querySelector("video"));
       elem.addEventListener("dblclick", function(e) {
         if (elem.requestFullscreen && !document.fullscreenElement) {
           elem.requestFullscreen();
@@ -118,6 +114,8 @@ export default {
         }
         e.preventDefault();
       });
+      console.log(this.msgbody)
+      this.changeRTSPByid(this.msgbody);
     },
 
     start(videoItem) {
@@ -144,7 +142,7 @@ export default {
           id: "start",
           sdpOffer: offerSdp,
           videourl: videoItem.rtsp,
-          sessionid: videoItem.id
+          sessionid: videoItem.sessionid
         };
         await that.sendMessage(message);
       }
@@ -154,11 +152,11 @@ export default {
           id: "onIceCandidate",
           candidate: candidate,
           videourl: videoItem.rtsp,
-          sessionid: videoItem.id
+          sessionid: videoItem.sessionid
         };
         await that.sendMessage(message);
       }
-      // this.showSpinner();
+      
 
       videoItem.webRtcPeer = new kurentoUtils.WebRtcPeer.WebRtcPeerRecvonly(
         options,
@@ -198,10 +196,9 @@ export default {
                   webRtcPeer.peerConnection.iceConnectionState ===
                     "disconnected"
                 ) {
-                  setTimeout(()=>{
-                  that.start(videoItem);
-
-                  },1000)
+                  setTimeout(() => {
+                    that.start(videoItem);
+                  }, 1000);
                 }
               }
             }
@@ -219,7 +216,7 @@ export default {
         const message = {
           id: "readyplay",
           videourl: videoItem.rtsp,
-          sessionid: videoItem.id
+          sessionid: videoItem.sessionid
         };
         await this.sendMessage(message);
       });
@@ -245,7 +242,7 @@ export default {
 
           var message = {
             id: "stop",
-            sessionid: videoItem.id
+            sessionid: videoItem.sessionid
           };
           this.sendMessage(message);
         });
@@ -256,21 +253,20 @@ export default {
       this.setState(videoItem, I_CAN_START);
     },
 
-    getVideoItem(id) {
-      return _.find(this.list, ["id", id]);
-    },
+    // getVideoItem(id) {
+    //   return _.find(this.list, ["id", id]);
+    // },
     async isLiveVideo(id) {
-      const item = await this.getVideoItem(id);
+      let item;
+      if (id === this.videoitem.sessionid) item = this.videoitem;
       if (!item.webRtcPeer) return false;
       return !!(item.webRtcPeer.getReceivers || false).active;
     },
 
     // 响应式生成video
 
-    async makeList() {
-      for (let i = 0; i < this.col * this.row; i++) {
-        this.list.push(new VideoItem(i));
-      }
+    async makeVideo() {
+      this.videoitem = new VideoItem(this.msgbody);
     },
 
     async changeRTSPByid({ sessionid, path, attr }) {
@@ -279,10 +275,9 @@ export default {
           res();
         }, 600);
 
-        if (_.isNumber(sessionid) && sessionid > this.col * this.row - 1)
-          return;
-        const item = await this.getVideoItem(sessionid);
-
+        if (!_.isNumber(sessionid)) return;
+        const item = await this.videoitem;
+        
         await this.stop(item);
         item.rtsp = path;
         item.attr = attr;
@@ -297,85 +292,85 @@ export default {
     //   path: "/ws",
     //   transports: ["websocket"]
     // });
-    await this.makeList();
+    await this.makeVideo();
 
-    this.$nextTick(() => {
-      document.querySelectorAll(".item").forEach(item => {
-        item.style.setProperty("flex", `0 0 calc((100vh / ${this.col}))`);
-        const videoitem = item.querySelector(".video");
-        videoitem.style.setProperty("width", `calc((100vw / ${this.row}))`);
-        videoitem.style.setProperty("height", `calc((100vh / ${this.col}))`);
-      });
-    });
+    // this.$nextTick(() => {
+    //   document.querySelectorAll(".item").forEach(item => {
+    //     item.style.setProperty("flex", `0 0 calc((100vh / ${this.col}))`);
+    //     const videoitem = item.querySelector(".video");
+    //     videoitem.style.setProperty("width", `calc((100vw / ${this.row}))`);
+    //     videoitem.style.setProperty("height", `calc((100vh / ${this.col}))`);
+    //   });
+    // });
 
     //dev
     this.socket = io(`http://${location.hostname}:8360`, {
       // path: "/",
-      transports: ["websocket"]
+      transports: ["websocket"],
+      query: {
+
+        sessionid: this.msgbody.sessionid
+      }
     });
 
     this.socket.on("connect", async () => {
       // 初始化播放列表
 
-      this.list.forEach(item => {
-        this.init(item);
-      });
+      this.init(this.videoitem);
+    });
 
-      this.socket.on("RTCmsg", async message => {
-        const parsedMessage = JSON.parse(message);
-        const videoItem = this.getVideoItem(parsedMessage.sessionid);
+    this.socket.on("RTCmsg", async message => {
+      const parsedMessage = JSON.parse(message);
+      const videoItem = this.videoitem;
 
-        // eslint-disable-next-line
+      // eslint-disable-next-line
 
-        switch (parsedMessage.id) {
-          case "viewerResponse":
-            this.startResponse(parsedMessage, videoItem);
-            break;
-          case "error":
-            if (videoItem.state == I_AM_STARTING) {
-              this.stop(videoItem);
+      switch (parsedMessage.id) {
+        case "viewerResponse":
+          this.startResponse(parsedMessage, videoItem);
+          break;
+        case "error":
+          if (videoItem.state == I_AM_STARTING) {
+            this.stop(videoItem);
+          }
+          onError("Error message from server: " + parsedMessage.message);
+          break;
+        case "stopCommunication":
+          videoItem.stopEvent.emit("stoped");
+          break;
+        case "videoInfo":
+          onError(parsedMessage);
+          break;
+        case "iceCandidate":
+          videoItem.webRtcPeer.addIceCandidate(
+            parsedMessage.candidate,
+            error => {
+              if (error)
+                return console.error("Error adding candidate: " + error);
             }
-            onError("Error message from server: " + parsedMessage.message);
-            break;
-          case "stopCommunication":
-            videoItem.stopEvent.emit("stoped");
-            break;
-          case "videoInfo":
-            onError(parsedMessage);
-            break;
-          case "iceCandidate":
-            videoItem.webRtcPeer.addIceCandidate(
-              parsedMessage.candidate,
-              error => {
-                if (error)
-                  return console.error("Error adding candidate: " + error);
-              }
+          );
+          break;
+        case "ping":
+          if (this.isLiveVideo(parsedMessage.sessionid)) {
+            await this.sendMessage({
+              id: "pong",
+              sessionid: this.videoitem.sessionid
+            });
+          } else {
+            const it = Promise.resolve(
+              this.getVideoItem(parsedMessage.sessionid)
             );
-            break;
-          case "ping":
-            if (this.isLiveVideo(parsedMessage.sessionid)) {
-              await this.sendMessage({
-                id: "pong",
-                sessionid: parsedMessage.sessionid
-              });
-            } else {
-              const it = Promise.resolve(
-                this.getVideoItem(parsedMessage.sessionid)
-              );
-              await this.stop(it);
-            }
-            break;
-          default:
-            if (videoItem.state == I_AM_STARTING) {
-              this.setState(videoItem, I_CAN_START);
-            }
-            onError("Unrecognized message", parsedMessage);
-        }
-      });
-      if (this.col * this.row === 1) {
-        this.changeRTSPByid(new Msgbody(0, this.path, {}));
+            await this.stop(it);
+          }
+          break;
+        default:
+          if (videoItem.state == I_AM_STARTING) {
+            this.setState(videoItem, I_CAN_START);
+          }
+          onError("Unrecognized message", parsedMessage);
       }
     });
+
     this.socket.on("disconnect", () => {
       // eslint-disable-next-line
       this.socket.open();
@@ -387,17 +382,7 @@ export default {
 <!-- Add "scoped" attribute to limit CSS to this component only -->
 <style lang="stylus" scoped>
 
-.container {
-  height: 100vh;
-  width: 100vw;
-  display: flex;
-  flex-flow: column wrap;
 
-  .item {
-    flex: 0 0 calc((100vh / 6));
-    position: relative;
-    text-align: center;
-    overflow: hidden;
 
     .video {
       width: calc((100vw / 2));
@@ -418,8 +403,8 @@ export default {
     .video::-webkit-media-controls {
       display: none !important;
     }
-  }
-}
+  
+
 </style>
 
 

@@ -1,7 +1,7 @@
 
 
 <template>
-  <div class="container">
+  <div class="containerVideoItem">
     <div class="item" :ref="`videoBox`">
       <video class="video" autoplay muted></video>
     </div>
@@ -381,12 +381,23 @@ export default {
 
 <!-- Add "scoped" attribute to limit CSS to this component only -->
 <style lang="stylus" scoped>
+    *
+      padding 0
+      margin 0
 
+    .containerVideoItem
+      width 100%
+      height 100%
 
+    .item
+      width 100%
+      height 100%
 
     .video {
-      width: calc((100vw / 2));
-      height: calc((100vh / 6));
+      /*width: calc((100vw / 2));
+      height: calc((100vh / 6));*/
+      width 100%
+      height 100%
       position: relative;
       z-index: 2;
       object-fit: fill;

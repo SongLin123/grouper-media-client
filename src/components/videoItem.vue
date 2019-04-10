@@ -184,7 +184,7 @@ export default {
                 ) {
                   setTimeout(async () => {
                     try {
-                      !!webRtcPeer.currentFrame;
+                      videoItem.webRtcPeer.currentFrame;
                     } catch (e) {
                       await that.stop(videoItem);
                     }
@@ -238,7 +238,7 @@ export default {
           }, 5000);
 
           videoItem.webRtcPeer.dispose();
-          videoItem.webRtcPeer = null;
+          // videoItem.webRtcPeer = null;
 
           var message = {
             id: "stop",
@@ -259,7 +259,7 @@ export default {
     async isLiveVideo(id) {
       let item;
       if (id === this.videoitem.sessionid) item = this.videoitem;
-      if (!item.webRtcPeer) return false;
+      if (!item) return false;
       return !!(item.webRtcPeer.getReceivers || false).active;
     },
 
@@ -320,7 +320,7 @@ export default {
     });
 
     this.socket.on("RTCmsg", async message => {
-      const parsedMessage = JSON.parse(message);
+      const parsedMessage = message;
       const videoItem = this.videoitem;
 
       // eslint-disable-next-line

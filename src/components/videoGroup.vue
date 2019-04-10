@@ -24,7 +24,8 @@ export default {
       col: 1, // 列
       row: 3, // 行
       //只有一个的video
-      list: []
+      list: [],
+      queueName:""
     };
   },
   methods: {
@@ -45,12 +46,33 @@ export default {
           for (let index = 0; index < list.length; index++) {
             const element = list[index];
             let it = {
-              id: index,
+              id: index+1,
               msgbody: new Msgbody(index+1, element.url, element)
             };
             this.list.push(it);
           }
         });
+    },
+    async changeQueue(arg,queueName){
+      console.log(queueName)
+      this.queueName=queueName;
+    if (_.isArray(arg)) {
+        for (let index = 0; index < arg.length; index++) {
+
+          const { sessionid, path, attr } = arg[index];
+          let name = "video" + sessionid;
+          console.log( arg)
+          await this.$refs[name][0].changeRTSPByid(
+            new Msgbody(sessionid, path, attr)
+          );
+        }
+      } else {
+        let { sessionid, path, attr } = arg;
+        let name = "video" +sessionid;
+        await this.$refs[name][0].changeRTSPByid(
+          new Msgbody(sessionid, path, attr)
+        );
+      }
     }
   },
   async created() {
@@ -70,24 +92,8 @@ export default {
       this.socket.emit("controlClient");
     });
 
-    this.socket.on("controlServer", async arg => {
-      if (_.isArray(arg)) {
-        for (let index = 0; index < arg.length; index++) {
-          const { sessionid, path, attr } = arg[index];
-          let name = "video" + (sessionid + 1);
-          console.log(this.$refs[name][0]);
-          await this.$refs[name][0].changeRTSPByid(
-            new Msgbody(sessionid + 1, path, attr)
-          );
-        }
-      } else {
-        let { sessionid, path, attr } = arg;
-        let name = "video" + (sessionid + 1);
-        await this.$refs[name][0].changeRTSPByid(
-          new Msgbody(sessionid + 1, path, attr)
-        );
-      }
-    });
+    const throttle=_.throttle(this.changeQueue,3000,{"leading":true,"trailing":false});
+    this.socket.on("controlServer", throttle);
   }
 };
 </script>

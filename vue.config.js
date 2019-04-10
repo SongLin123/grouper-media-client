@@ -23,7 +23,7 @@ module.exports = {
             },
             '/api': {
 
-                target: 'http://192.168.63.27:8080',
+                target: 'http://192.168.63.27:8888',
                 changeOrigin: true,
             }
         },

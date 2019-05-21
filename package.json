@@ -1,10 +1,11 @@
 {
   "name": "grouper-media-client",
-  "version": "0.1.0",
-  "private": true,
+  "version": "0.1.2",
+  "private": false,
+  "main": "src/index.js",
   "scripts": {
     "serve": "vue-cli-service serve",
-    "build": "vue-cli-service build",
+    "build": "vue-cli-service build --target wc --name media-component src/App.vue",
     "lint": "vue-cli-service lint"
   },
   "dependencies": {

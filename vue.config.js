@@ -28,7 +28,7 @@ module.exports = {
 
 
 
-    publicPath: "/static",
+    publicPath: "/",
     outputDir: "dist",
     assetsDir: '',
     runtimeCompiler: undefined,

@@ -50,6 +50,7 @@ class VideoItem {
 }
 
 export default {
+  name:"videoItem",
   props: {
     msgbody: {},
     lockstate: Boolean,

@@ -21,22 +21,33 @@
 import { Msgbody } from "./Msgbody";
 import _ from "lodash";
 
-import { initVideo, lockVideo, getLockVideo } from "./api.js";
+
 import io from "socket.io-client";
 
 import videoitem from "./videoItem.vue";
 import marqueeTitle from "./marqueeTitle";
 
 export default {
+  name: "MediaComponents",
   components: { videoitem, marqueeTitle },
-  props: {},
+  props: {
+    sidename: String,
+    col: Number,
+    row: Number,
+    first: Number,
+    path: String,
+    attr: Object,
+    initVideo: Function,
+    lockVideo: Function,
+    getLockVideo: Function
+  },
   data() {
     return {
-      path: "rtsp://admin:12345daoge@172.16.252.38:554/Streaming/Channels/0301",
-      attr: {},
-      col: 1, // 列
-      row: 1, // 行
-      first: 1, //起点
+      // path: "rtsp://admin:12345daoge@172.16.252.38:554/Streaming/Channels/0301",
+      // attr: {},
+      // col: 1, // 列
+      // row: 1, // 行
+      // first: 1, //起点
       //只有一个的video
       list: [],
       lockcams: [],
@@ -58,10 +69,10 @@ export default {
         this.lockcams.push(par);
       }
 
-      lockVideo({ cams: this.lockcams });
+      this.lockVideo({ cams: this.lockcams });
     },
     async getlocklist() {
-      await getLockVideo().then(res => {
+      await this.getLockVideo().then(res => {
         this.lockcams = res.data.cams;
         res.data.cams.forEach(element => {
           if (element.sessionid) {
@@ -72,11 +83,11 @@ export default {
     },
 
     async getList() {
-      let videolist = localStorage.getItem("videolist" + this.$route.name);
+      let videolist = localStorage.getItem("videolist" + this.sidename);
       if (videolist) {
         this.list = JSON.parse(videolist);
       } else {
-        await initVideo({
+        await this.initVideo({
           count: this.col * this.row,
           first: this.first
         }).then(async res => {
@@ -110,9 +121,6 @@ export default {
         return;
       }
 
-      if (this.$route.name === "right") {
-        this.first = 13;
-      }
 
       await this.getList();
       await this.getlocklist();
@@ -155,9 +163,10 @@ export default {
   },
   async created() {
     await this.initAllvideo();
-    localStorage.setItem(this.$route.name, true);
+    localStorage.setItem(this.sidename, true);
 
-    setTimeout(() => {
+    if(this.row*this.col!==1){
+      setTimeout(() => {
       let arr = [];
       for (let key in this.$refs) {
         let ele = this.$refs[key][0].videoitem;
@@ -167,9 +176,11 @@ export default {
           msgbody: { attr: ele.attr, path: ele.rtsp, sessionid: ele.sessionid }
         });
       }
-      localStorage.setItem("videolist" + this.$route.name, JSON.stringify(arr));
+      localStorage.setItem("videolist" + this.sidename, JSON.stringify(arr));
       location.reload();
     }, 1800 * 1000);
+    }
+    
 
     if (this.col * this.row !== 1) {
       this.socket = io(`http://${location.hostname}:${location.port}`, {
@@ -193,13 +204,13 @@ export default {
       this.socket.on("controlServer", throttle);
     } else {
       let videoDiv = document.querySelector(".videoDiv");
-      videoDiv.style.setProperty("height", "100vh");
+      videoDiv.style.setProperty("height", "100%");
       videoDiv.style.setProperty("display", "block");
       videoDiv.querySelector(".videoitem").style.setProperty("height", "100%");
     }
   },
   beforeDestroy() {
-    localStorage.removeItem(this.$route.name);
+    localStorage.removeItem(this.sidename);
   }
 };
 </script>
@@ -212,7 +223,7 @@ $titleDivHeight = 40px;
 }
 
 .container {
-  height: 100vh;
+  height: 100%;
   width: 100vw;
   min-height: 0;
   min-width: 0;

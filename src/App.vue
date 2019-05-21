@@ -1,43 +1,37 @@
 <template>
   <div id="app">
-    <videogroup ref="videogroup" />
+    <!-- <videogroup ref="videogroup" :half="'left'"/> -->
+    <div>
+      <router-view></router-view>
+    </div>
+    
     <!-- <button class="start" @click="start">sdasdadsa</button> -->
     <!-- <button class="start" @click="stop">stop</button> -->
   </div>
 </template>
 
 <script>
-import videogroup from "./components/videoGroup";
+// import videogroup from "./components/videoGroup";
 
-// import { Msgbody } from "./Msgbody.js";
 
-// import _ from "lodash";
-
-// import axios from "axios";
 
 export default {
   name: "app",
   components: {
-    videogroup
+    // videogroup
   },
   data() {
     return {
-      col: 1,
-      row: 1,
-      socket: null,
-      prop: []
     };
   },
   methods: {
 
   },
   async created() {
-    // try {
-    //   await this.initAllvideo();
-    // } catch (e) {
-    //   if (e === "onevideo") return;
-    // }
-
+    if(!this.$route.name){
+       this.$router.push("/open")
+    }
+   
     
   }
 };

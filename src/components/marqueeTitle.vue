@@ -15,7 +15,7 @@
                 default: 2
             },
             speed: {
-                default: 20
+                default: 34
             }
         },
         data() {
@@ -33,7 +33,7 @@
                 }
                 let text = document.querySelector(".marqueeTitleContent");
                 const offsetWidth = text.offsetWidth;
-                text.style.width= offsetWidth + "px";
+                
                 const offsetLeft = text.offsetLeft;
                 const left = offsetWidth + offsetLeft;
                 this.timer = setInterval(() => {
@@ -43,7 +43,7 @@
                     if (sum < 0) {
                         text.style.marginLeft = marginLeftMax + "px";
                         num = text.style.marginLeft.split("px")[0];
-                        console.log(text.style.marginLeft)
+                    
                     }
                     num -= this.duration;
                     text.style.marginLeft = num + "px";

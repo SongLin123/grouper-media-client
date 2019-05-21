@@ -2,8 +2,18 @@
 
 <template>
   <div class="containerVideoItem">
-    <div class="item" :ref="`videoBox`">
+    <div
+      :class="'item'"
+      :ref="`videoBox`"
+      @contextmenu="rightclick"
+      @mouseover="showTitle=true"
+      @mouseleave="showTitle=false"
+    >
+      <div class="border" @dblclick="fullscreen" :class="lockstate?'locked':''"></div>
+      <div class="pathTitle" v-show="showTitle">{{path}}</div>
       <video class="video" autoplay muted></video>
+      <canvas v-show="false" ref="dif"></canvas>
+      <canvas v-show="false" ref="cur"></canvas>
     </div>
   </div>
 </template>
@@ -11,7 +21,7 @@
 <script>
 import io from "socket.io-client";
 import _ from "lodash";
-
+import { drawImg, calcDiff } from "./testingStop.js";
 
 import kurentoUtils from "kurento-utils";
 import { EventEmitter } from "events";
@@ -41,30 +51,40 @@ class VideoItem {
 
 export default {
   props: {
-    msgbody:{}
+    msgbody: {},
+    lockstate: Boolean,
+    nolock:Boolean
   },
   data() {
     return {
       test: "",
       videoitem: {},
       socket: null,
-      socketPath: "signal"
+      socketPath: "signal",
+      showTitle: false,
+      path: "",
+
+      preCanvas: null, //前一帧
+      curCanvas: null, //当前帧
+      diffCanvas: null, //差异帧
+      preFrame: null, //前一帧
+      curFrame: null, //当前帧
+      diffFrame: null //差异帧
     };
   },
-  // beforeDestroy() {
-  //   this.stopAll();
-  // },
+  
   methods: {
-    // stopAll() {
-    //   this.list.forEach(it => {
-    //     this.stop(it);
-    //   });
-    // },
-    // startAll() {
-    //   this.list.forEach(item => {
-    //     this.start(item);
-    //   });
-    // },
+    rightclick(e) {
+      e.preventDefault();
+      if(this.nolock) return;
+      
+      const video = this.videoitem;
+      this.$emit("rightclick", {
+        sessionid: video.sessionid,
+        attr: video.attr,
+        path: video.rtsp
+      });
+    },
 
     setState(item, state) {
       switch (state) {
@@ -102,10 +122,14 @@ export default {
         res();
       });
     },
+
+    fullscreen(e){
+      e.target.parentNode.querySelector("video").requestFullscreen();
+    },
     init(videoItem) {
-      const elem = (videoItem.video = this.$refs[
-        'videoBox'
-      ].querySelector("video"));
+      const elem = (videoItem.video = this.$refs["videoBox"].querySelector(
+        "video"
+      ));
       elem.addEventListener("dblclick", function(e) {
         if (elem.requestFullscreen && !document.fullscreenElement) {
           elem.requestFullscreen();
@@ -114,29 +138,34 @@ export default {
         }
         e.preventDefault();
       });
-      console.log(this.msgbody)
+
       this.changeRTSPByid(this.msgbody);
     },
 
     start(videoItem) {
-      // if (videoItem.state !== I_CAN_START) {
-      //   this.stop(videoItem);
-      // }
+      if (videoItem.state !== I_CAN_START) {
+        this.stop(videoItem);
+      }
 
       this.setState(videoItem, I_AM_STARTING);
       let options = {
         remoteVideo: videoItem.video,
         mediaConstraints: {
           audio: false,
-          video: true
+          video: {
+            width: 1280,
+            height: 720,
+            frameRate: 25,
+            aspectRatio: 1.77
+          }
         },
         onicecandidate: onIceCandidate
       };
 
       const that = this;
+
       async function onOffer(error, offerSdp) {
         if (error) return console.error("Error generating the offer");
-        console.info("Invoking SDP offer callback function " + location.host);
 
         var message = {
           id: "start",
@@ -156,59 +185,18 @@ export default {
         };
         await that.sendMessage(message);
       }
-      
 
-      videoItem.webRtcPeer = new kurentoUtils.WebRtcPeer.WebRtcPeerRecvonly(
+      videoItem.webRtcPeer = kurentoUtils.WebRtcPeer.WebRtcPeerRecvonly(
         options,
         function(error) {
           if (error) return console.error(error);
-          const webRtcPeer = videoItem.webRtcPeer;
 
-          webRtcPeer.generateOffer(onOffer);
-          webRtcPeer.peerConnection.addEventListener(
-            "iceconnectionstatechange",
-            function() {
-              console.log(videoItem);
-              if (webRtcPeer && webRtcPeer.peerConnection) {
-                const time = new Date();
-                console.log(
-                  videoItem.id + webRtcPeer.peerConnection.iceConnectionState
-                );
-                // console.log(
-                //   "icegatheringstate -> " +
-                //     webRtcPeer.peerConnection.iceGatheringState
-                // );
-                console.log(time, time.getTime());
-                if (
-                  webRtcPeer.peerConnection.iceConnectionState === "connected"
-                ) {
-                  setTimeout(async () => {
-                    try {
-                      videoItem.webRtcPeer.currentFrame;
-                    } catch (e) {
-                      await that.stop(videoItem);
-                    }
-                  }, 5000);
-                  that.setState(videoItem, I_CAN_STOP);
-                }
-                if (
-                  webRtcPeer.peerConnection.iceConnectionState === "failed" ||
-                  webRtcPeer.peerConnection.iceConnectionState ===
-                    "disconnected"
-                ) {
-                  setTimeout(() => {
-                    that.start(videoItem);
-                  }, 1000);
-                }
-              }
-            }
-          );
+          this.generateOffer(onOffer);
         }
       );
     },
     startResponse(message, videoItem) {
       this.setState(videoItem, I_CAN_STOP);
-      console.log("SDP answer received from server. Processing ...");
 
       videoItem.webRtcPeer.processAnswer(message.sdpAnswer, async error => {
         if (error) return console.error(error);
@@ -224,21 +212,19 @@ export default {
 
     async stop(videoItem) {
       if (videoItem.state === I_CAN_START) return;
-      console.log("Stopping video ...");
 
       if (videoItem.webRtcPeer) {
         await new Promise(res => {
           videoItem.stopEvent.once("stoped", function() {
-            videoItem.stopEvent.removeAllListeners();
+            this.removeAllListeners();
             res();
           });
           setTimeout(() => {
             videoItem.stopEvent.removeAllListeners();
             res();
-          }, 5000);
+          }, 500);
 
           videoItem.webRtcPeer.dispose();
-          // videoItem.webRtcPeer = null;
 
           var message = {
             id: "stop",
@@ -253,9 +239,6 @@ export default {
       this.setState(videoItem, I_CAN_START);
     },
 
-    // getVideoItem(id) {
-    //   return _.find(this.list, ["id", id]);
-    // },
     async isLiveVideo(id) {
       let item;
       if (id === this.videoitem.sessionid) item = this.videoitem;
@@ -267,21 +250,90 @@ export default {
 
     async makeVideo() {
       this.videoitem = new VideoItem(this.msgbody);
+      let count = 0;
+      let cache = {};
+      let height, width;
+      //每分钟的5s检查有没有图像，没有的重连
+      setInterval(async () => {
+        let now = new Date().getUTCSeconds();
+        // 5s间隔
+        if (now % 5 !== 0) return;
+
+        try {
+          this.curCanvas = this.$refs["cur"];
+          (height = height || this.curCanvas.height),
+            (width = width || this.curCanvas.width);
+          count++;
+          if (count === 1) {
+            this.curFrame = this.curCanvas.toDataURL();
+            this.diffCanvas = this.$refs["dif"];
+
+            this.diffCanvas.height = height;
+            this.diffCanvas.width = width;
+
+            this.diffCanvas.getContext("2d").globalCompositeOperation =
+              "difference";
+
+            return;
+          }
+        } catch (e) {
+          if (e instanceof TypeError) {
+            await this.start(this.videoitem);
+
+            return;
+          }
+        }
+
+        try {
+          const diffContext = this.diffCanvas.getContext("2d");
+
+          //清空画布
+          diffContext.clearRect(0, 0, width, height);
+
+          let curctx = this.curCanvas.getContext("2d");
+          curctx.drawImage(this.videoitem.video, 0, 0, width, height);
+
+          this.preFrame = null;
+          this.preFrame = this.curFrame;
+
+          let opt = { width, height, diffContext };
+
+          this.curFrame = null;
+          this.curFrame = this.curCanvas.toDataURL();
+
+          //画上两帧
+          await drawImg(this.preFrame, opt);
+          await drawImg(this.curFrame, opt);
+
+          let diffFrame = diffContext.getImageData(0, 0, width, height);
+
+          let index = calcDiff(diffFrame, cache);
+
+          if (!index) throw index;
+        } catch (e) {
+          count = 0;
+          console.log("stoped", this.videoitem.sessionid);
+          await this.start(this.videoitem);
+        }
+      }, 1000);
     },
 
     async changeRTSPByid({ sessionid, path, attr }) {
       await new Promise(async res => {
-        setTimeout(() => {
+        setImmediate(() => {
           res();
-        }, 600);
+        });
 
         if (!_.isNumber(sessionid)) return;
-        const item = await this.videoitem;
-        
+        const item = this.videoitem;
+
         await this.stop(item);
         item.rtsp = path;
         item.attr = attr;
         await this.start(item);
+
+        this.path = item.rtsp;
+
       });
     }
   },
@@ -294,21 +346,11 @@ export default {
     // });
     await this.makeVideo();
 
-    // this.$nextTick(() => {
-    //   document.querySelectorAll(".item").forEach(item => {
-    //     item.style.setProperty("flex", `0 0 calc((100vh / ${this.col}))`);
-    //     const videoitem = item.querySelector(".video");
-    //     videoitem.style.setProperty("width", `calc((100vw / ${this.row}))`);
-    //     videoitem.style.setProperty("height", `calc((100vh / ${this.col}))`);
-    //   });
-    // });
-
     //dev
-    this.socket = io(`http://${location.hostname}:8360`, {
+    this.socket = io(`http://${location.hostname}:${location.port}`, {
       // path: "/",
       transports: ["websocket"],
       query: {
-
         sessionid: this.msgbody.sessionid
       }
     });
@@ -322,8 +364,6 @@ export default {
     this.socket.on("RTCmsg", async message => {
       const parsedMessage = message;
       const videoItem = this.videoitem;
-
-      // eslint-disable-next-line
 
       switch (parsedMessage.id) {
         case "viewerResponse":
@@ -381,41 +421,70 @@ export default {
 
 <!-- Add "scoped" attribute to limit CSS to this component only -->
 <style lang="stylus" scoped>
-    *
-      padding 0
-      margin 0
+* {
+  padding: 0;
+  margin: 0;
+}
 
-    .containerVideoItem
-      width 100%
-      height 100%
+.containerVideoItem {
+  width: 100%;
+  height: 100%;
+}
 
-    .item
-      width 100%
-      height 100%
+.item {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  box-sizing: border-box;
 
-    .video {
-      /*width: calc((100vw / 2));
-      height: calc((100vh / 6));*/
-      width 100%
-      height 100%
-      position: relative;
-      z-index: 2;
-      object-fit: fill;
-      background: center / 20% #fff url('/static/spinner.gif') no-repeat !important;
-    }
+  .pathTitle {
+    width: 100%;
+    height: 20px;
+    opacity: 0.5;
+    background: rgb(0, 0, 0);
+    color: rgb(255, 255, 255);
+    position: absolute;
+    bottom: 0px;
+    left: 0;
+    z-index: 1000;
+    line-height: 20px;
+    text-align: center;
+    font-size: 14px;
+  }
 
-    .video:-webkit-full-screen {
-      width: 100%;
-      height: 100%;
-      object-fit: contain;
-      background: center / 20% #fff url('/static/spinner.gif') no-repeat !important;
-    }
+  .border{
+    width:100%;
+    height 100%
+    position absolute
+    top 0
+    left 0
+    z-index 100
+  }
+  .locked {
+    box-shadow: inset 0px 0px 0px 5px rgba(0, 0, 255, 0.5);
+  }
+}
 
-    .video::-webkit-media-controls {
-      display: none !important;
-    }
-  
+.video {
+  width: 100%;
+  height: 100%;
+  position: absolute;
+  left: 0;
+  z-index: 2;
+  object-fit: fill;
+  background: center / 20% #fff url('/static/spinner.gif') no-repeat !important;
+}
 
+.video:-webkit-full-screen {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: center / 20% #fff url('/static/spinner.gif') no-repeat !important;
+}
+
+.video::-webkit-media-controls {
+  display: none !important;
+}
 </style>
 
 

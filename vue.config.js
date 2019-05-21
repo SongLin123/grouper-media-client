@@ -3,27 +3,24 @@ module.exports = {
     // 选项...
 
     devServer: {
-
         proxy: {
-            '/ws': {
+            '/socket.io': {
+                // target: 'http://10.2.0.14:8360',
                 target: 'http://127.0.0.1:8360',
                 ws: true,
                 changeOrigin: true,
-                pathRewrite: {
-                    '^/ws': '/socket.io'
-                }
+                
             },
             "/jsapi": {
+                // target: 'http://10.2.0.14:8360',
                 target: 'http://127.0.0.1:8360',
-                ws: true,
+                ws: false,
                 changeOrigin: true,
-                pathRewrite: {
-                    '^/ws': '/socket.io'
-                }
+                
             },
             '/api': {
 
-                target: 'http://192.168.63.27:8888',
+                target: 'http://10.2.0.14:18888',
                 changeOrigin: true,
             }
         },

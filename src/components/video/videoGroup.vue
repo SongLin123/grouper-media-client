@@ -1,7 +1,7 @@
 
 <template>
   <div class="container videoGroup">
-    <div class="titleDiv">
+    <div v-if="col*row!==1" class="titleDiv">
       <marquee-title :marquee-title="queueName"></marquee-title>
     </div>
     <div class="videoDiv">
@@ -18,10 +18,10 @@
   </div>
 </template>
 <script>
-import { Msgbody } from "../Msgbody";
+import { Msgbody } from "./Msgbody";
 import _ from "lodash";
 
-import { initVideo, lockVideo, getLockVideo } from "../api.js";
+import { initVideo, lockVideo, getLockVideo } from "./api.js";
 import io from "socket.io-client";
 
 import videoitem from "./videoItem.vue";
@@ -34,8 +34,8 @@ export default {
     return {
       path: "rtsp://admin:12345daoge@172.16.252.38:554/Streaming/Channels/0301",
       attr: {},
-      col: 3, // 列
-      row: 4, // 行
+      col: 1, // 列
+      row: 1, // 行
       first: 1, //起点
       //只有一个的video
       list: [],
@@ -44,14 +44,13 @@ export default {
       videoTitle: "定时轮屏任务"
     };
   },
-  
+
   methods: {
     rightclick(par) {
-      
-      let item=_.find(this.list,{id:Number(par.sessionid)});
-      item.lockstate=!item.lockstate;
+      let item = _.find(this.list, { id: Number(par.sessionid) });
+      item.lockstate = !item.lockstate;
 
-      if (_.find(this.lockcams, {sessionid:par.sessionid})) {
+      if (_.find(this.lockcams, { sessionid: par.sessionid })) {
         _.remove(this.lockcams, function(item) {
           return item.sessionid === par.sessionid;
         });
@@ -63,11 +62,10 @@ export default {
     },
     async getlocklist() {
       await getLockVideo().then(res => {
-        this.lockcams=res.data.cams;
+        this.lockcams = res.data.cams;
         res.data.cams.forEach(element => {
           if (element.sessionid) {
             this.$refs["video" + element.sessionid][0].lockstate = true;
-            
           }
         });
       });
@@ -90,7 +88,7 @@ export default {
             let it = {
               id: first,
               msgbody: new Msgbody(first, element.url, element.attr),
-              lockstate:false
+              lockstate: false
             };
             this.list.push(it);
             first++;
@@ -104,8 +102,8 @@ export default {
         let it = {
           id: 1,
           msgbody: new Msgbody(1, this.path, this.attr),
-          lockstate:false,
-          nolock:true
+          lockstate: false,
+          nolock: true
         };
         this.list.push(it);
 
@@ -157,7 +155,7 @@ export default {
   },
   async created() {
     await this.initAllvideo();
-    localStorage.setItem(this.$route.name,true);
+    localStorage.setItem(this.$route.name, true);
 
     setTimeout(() => {
       let arr = [];
@@ -173,28 +171,35 @@ export default {
       location.reload();
     }, 1800 * 1000);
 
-    this.socket = io(`http://${location.hostname}:${location.port}`, {
-      path: "/socket.io",
-      transports: ["websocket"],
-      query: {
-        first: this.first,
-        number: this.row * this.col
-      }
-    });
-    this.socket.on("connect", async () => {
-      // 初始化播放列表
+    if (this.col * this.row !== 1) {
+      this.socket = io(`http://${location.hostname}:${location.port}`, {
+        path: "/socket.io",
+        transports: ["websocket"],
+        query: {
+          first: this.first,
+          number: this.row * this.col
+        }
+      });
+      this.socket.on("connect", async () => {
+        // 初始化播放列表
 
-      this.socket.emit("controlClient");
-    });
+        this.socket.emit("controlClient");
+      });
 
-    const throttle = _.throttle(this.changeQueue, 3000, {
-      leading: true,
-      trailing: false
-    });
-    this.socket.on("controlServer", throttle);
+      const throttle = _.throttle(this.changeQueue, 3000, {
+        leading: true,
+        trailing: false
+      });
+      this.socket.on("controlServer", throttle);
+    } else {
+      let videoDiv = document.querySelector(".videoDiv");
+      videoDiv.style.setProperty("height", "100vh");
+      videoDiv.style.setProperty("display", "block");
+      videoDiv.querySelector(".videoitem").style.setProperty("height", "100%");
+    }
   },
-  beforeDestroy(){
-     localStorage.removeItem(this.$route.name);
+  beforeDestroy() {
+    localStorage.removeItem(this.$route.name);
   }
 };
 </script>

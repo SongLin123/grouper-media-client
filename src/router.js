@@ -1,6 +1,6 @@
 import Vue from 'vue'
 import Router from 'vue-router'
-import videoGroup from './components/videoGroup.vue'
+import videoGroup from './components/video/videoGroup.vue'
 import Home from './components/home.vue'
 
 Vue.use(Router)

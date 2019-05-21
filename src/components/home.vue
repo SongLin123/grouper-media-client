@@ -12,7 +12,7 @@
 </template>
 
 <script>
-import {changeVideo} from "../api";
+import {changeVideo} from "./video/api";
 export default {
   data() {
     return {

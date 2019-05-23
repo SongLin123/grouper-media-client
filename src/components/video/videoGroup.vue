@@ -21,7 +21,6 @@
 import { Msgbody } from "./Msgbody";
 import _ from "lodash";
 
-
 import io from "socket.io-client";
 
 import videoitem from "./videoItem.vue";
@@ -31,15 +30,43 @@ export default {
   name: "MediaComponents",
   components: { videoitem, marqueeTitle },
   props: {
+    //组播，全部为1即为单播
+    col: {
+      type: Number,
+      required: true
+    },
+    row: {
+      type: Number,
+      required: true
+    },
+    first: {
+      type: Number,
+      required: true
+    },
+    //区分单页
     sidename: String,
-    col: Number,
-    row: Number,
-    first: Number,
-    path: String,
-    attr: Object,
-    initVideo: Function,
-    lockVideo: Function,
-    getLockVideo: Function
+
+    //单播的播放源
+    path: { type: String, required: false, defalut: null },
+    attr: { type: Object, required: false, defalut: null },
+
+
+    //组播时的api
+    initVideo: {
+      type: Function,
+      required: false,
+      defalut: null
+    },
+    lockVideo: {
+      type: Function,
+      required: false,
+      defalut: null
+    },
+    getLockVideo: {
+      type: Function,
+      required: false,
+      defalut: null
+    }
   },
   data() {
     return {
@@ -121,7 +148,6 @@ export default {
         return;
       }
 
-
       await this.getList();
       await this.getlocklist();
 
@@ -162,27 +188,35 @@ export default {
     }
   },
   async created() {
+    if (
+      !(this.lockVideo && this.getLockVideo && this.initVideo) &&
+      this.col * this.row !== 1
+    ) {
+      console.error("Fuction lockVideo or getLockVideo or initVideo not bind");
+      return;
+    }
     await this.initAllvideo();
     localStorage.setItem(this.sidename, true);
 
-    if(this.row*this.col!==1){
-      setTimeout(() => {
-      let arr = [];
-      for (let key in this.$refs) {
-        let ele = this.$refs[key][0].videoitem;
-
-        arr.push({
-          id: ele.sessionid,
-          msgbody: { attr: ele.attr, path: ele.rtsp, sessionid: ele.sessionid }
-        });
-      }
-      localStorage.setItem("videolist" + this.sidename, JSON.stringify(arr));
-      location.reload();
-    }, 1800 * 1000);
-    }
-    
-
     if (this.col * this.row !== 1) {
+      setTimeout(() => {
+        let arr = [];
+        for (let key in this.$refs) {
+          let ele = this.$refs[key][0].videoitem;
+
+          arr.push({
+            id: ele.sessionid,
+            msgbody: {
+              attr: ele.attr,
+              path: ele.rtsp,
+              sessionid: ele.sessionid
+            }
+          });
+        }
+        localStorage.setItem("videolist" + this.sidename, JSON.stringify(arr));
+        location.reload();
+      }, 1800 * 1000);
+
       this.socket = io(`http://${location.hostname}:${location.port}`, {
         path: "/socket.io",
         transports: ["websocket"],

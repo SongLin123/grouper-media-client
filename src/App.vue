@@ -19,7 +19,7 @@
 
 <script>
 // import videogroup from "./components/video/videoGroup";
-import { initVideo, lockVideo, getLockVideo } from "./components/video/api.js";
+import { initVideo, lockVideo, getLockVideo } from "./api.js";
 
 const Enum={
   SINGLE:"single",
@@ -37,7 +37,7 @@ export default {
       path: "rtsp://admin:12345@10.2.0.64:554/Streaming/Channels/1301",
       attr: {},
       col: 1, // 列
-      row: 1, // 行
+      row: 5, // 行
       first: 1, //起点
       initVideo,
       lockVideo,

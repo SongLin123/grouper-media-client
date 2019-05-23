@@ -1,7 +1,8 @@
 .DS_Store
 node_modules
+public
 vue.config.js
-api.js
+src/api.js
 
 # local env files
 .env.local

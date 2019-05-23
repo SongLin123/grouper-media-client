@@ -1,7 +1,7 @@
 .DS_Store
 node_modules
-public
-vue.config.js
+public/
+/vue.config.js
 src/api.js
 
 # local env files
